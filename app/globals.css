@@ -66,3 +66,25 @@ body {
 .dark label.hover\:bg-slate-100:hover {
   @apply bg-slate-800;
 }
+
+/* ---------- Accessibility modes ---------- */
+.a11y-dys body, .a11y-dys p, .a11y-dys div, .a11y-dys li {
+  letter-spacing: 0.03em;
+  word-spacing: 0.08em;
+  line-height: 1.75;
+}
+.a11y-contrast body {
+  @apply bg-white text-black;
+}
+.a11y-contrast .card {
+  @apply bg-white border-black text-black;
+}
+.a11y-contrast .btn-primary {
+  @apply bg-black;
+}
+.dark.a11y-contrast body {
+  @apply bg-black text-white;
+}
+.dark.a11y-contrast .card {
+  @apply bg-black border-white text-white;
+}

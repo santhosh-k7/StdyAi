@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ThemeToggle from "@/components/theme-toggle";
+import A11yBar from "@/components/a11y-bar";
 
 export const metadata: Metadata = {
   title: "StdyAI — BIS-Compliant Adaptive Learning",
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{})})}` }} />
         {children}
         <ThemeToggle />
+        <A11yBar />
       </body>
     </html>
   );

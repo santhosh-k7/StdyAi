@@ -13,7 +13,14 @@ export type User = {
   createdAt: string;
 };
 export type Session = { token: string; userId: string; expiresAt: number };
-type DB = { users: User[]; sessions: Session[] };
+export type Progress = { userId: string; at: string; score: number; total: number; level: string };
+export type ReportRec = { id: string; teacherId: string; title: string; overall: number; grade: string; at: string };
+export type CertRec = { id: string; hash: string; chainHash: string; prev: string; title: string; score: number; teacherId: string; at: string };
+export type Classroom = { id: string; name: string; code: string; teacherId: string; students: string[]; createdAt: string };
+export type Audit = { id: string; actorId: string; action: string; detail: string; at: string };
+type DB = { users: User[]; sessions: Session[]; progress: Progress[]; reports: ReportRec[]; certs: CertRec[]; classrooms: Classroom[]; audit: Audit[] };
+
+const EMPTY: DB = { users: [], sessions: [], progress: [], reports: [], certs: [], classrooms: [], audit: [] };
 
 // Serverless filesystems (Vercel/AWS Lambda) are read-only except /tmp.
 // Local dev uses ./data (persisted, gitignored); production uses /tmp.
@@ -25,18 +32,29 @@ async function ensureFile() {
   try {
     await fs.access(DB_PATH);
   } catch {
-    await fs.writeFile(DB_PATH, JSON.stringify({ users: [], sessions: [] }, null, 2));
+    await fs.writeFile(DB_PATH, JSON.stringify(EMPTY, null, 2));
   }
+}
+
+function normalize(j: Partial<DB>): DB {
+  return {
+    users: Array.isArray(j.users) ? j.users : [],
+    sessions: Array.isArray(j.sessions) ? j.sessions : [],
+    progress: Array.isArray(j.progress) ? j.progress : [],
+    reports: Array.isArray(j.reports) ? j.reports : [],
+    certs: Array.isArray(j.certs) ? j.certs : [],
+    classrooms: Array.isArray(j.classrooms) ? j.classrooms : [],
+    audit: Array.isArray(j.audit) ? j.audit : [],
+  };
 }
 
 export async function readDB(): Promise<DB> {
   await ensureFile();
   try {
     const raw = await fs.readFile(DB_PATH, "utf8");
-    const j = JSON.parse(raw);
-    return { users: Array.isArray(j.users) ? j.users : [], sessions: Array.isArray(j.sessions) ? j.sessions : [] };
+    return normalize(JSON.parse(raw));
   } catch {
-    return { users: [], sessions: [] };
+    return { ...EMPTY };
   }
 }
 

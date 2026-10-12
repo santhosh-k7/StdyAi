@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { sha256Hex, shortHash } from "@/lib/cert";
 import { RequireRole, UserBar, useMe } from "@/components/auth-clients";
@@ -25,8 +25,41 @@ function TeacherDash() {
   const [report, setReport] = useState<Report | null>(null);
   const [improved, setImproved] = useState("");
   const [loading, setLoading] = useState(false);
-  const [cert, setCert] = useState<{ hash: string; short: string } | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const [cert, setCert] = useState<{ hash: string; short: string; id?: string } | null>(null);
   const [err, setErr] = useState("");
+  const [rooms, setRooms] = useState<{ id: string; name: string; code: string; members: { id: string; name: string; attempts: number; avg: number | null }[] }[]>([]);
+  const [hist, setHist] = useState<{ id: string; title: string; overall: number; grade: string; at: string }[]>([]);
+  const [clsName, setClsName] = useState("");
+
+  async function refresh() {
+    try {
+      const [c, h] = await Promise.all([fetch("/api/classroom").then((r) => r.json()), fetch("/api/reports").then((r) => r.json())]);
+      if (c.rooms) setRooms(c.rooms);
+      if (h.reports) setHist(h.reports);
+    } catch {}
+  }
+  useEffect(() => { refresh(); }, []);
+
+  async function onFile(f: File | undefined) {
+    if (!f) return;
+    if (/\.(txt|md)$/i.test(f.name)) {
+      const t = await f.text().catch(() => "");
+      setContent(t.slice(0, 30000) || content);
+      setTitle((t2) => t2 || f.name.replace(/\.[^.]+$/, ""));
+      return;
+    }
+    setParsing(true); setErr("");
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      const r = await fetch("/api/parse", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Parse failed");
+      setContent((j.text || "").slice(0, 30000));
+      setTitle((t2) => (t2 === DEMO_TITLE ? (j.name || "").replace(/\.[^.]+$/, "") : t2));
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : "Parse failed"); }
+    finally { setParsing(false); }
+  }
 
   async function run(mode: "analyze" | "improve") {
     setLoading(true); setErr("");
@@ -42,6 +75,7 @@ function TeacherDash() {
         localStorage.setItem("stdyai-report", JSON.stringify(j.report));
         localStorage.setItem("stdyai-content", improved || content);
         localStorage.setItem("stdyai-title", title);
+        fetch("/api/reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, overall: j.report.overall, grade: j.report.grade }) }).then(() => refresh()).catch(() => {});
       } else {
         setImproved(j.improved);
         localStorage.setItem("stdyai-content", j.improved);
@@ -57,8 +91,29 @@ function TeacherDash() {
   async function certificate() {
     const payload = `${title}::${improved || content}::${report?.overall}::${new Date().toISOString()}`;
     const h = await sha256Hex(payload);
-    setCert({ hash: h, short: shortHash(h) });
-    localStorage.setItem("stdyai-cert", JSON.stringify({ hash: h, short: shortHash(h), title, score: report?.overall, at: new Date().toISOString() }));
+    const rec = { hash: h, short: shortHash(h), title, score: report?.overall, at: new Date().toISOString() };
+    setCert(rec);
+    localStorage.setItem("stdyai-cert", JSON.stringify(rec));
+    try {
+      const r = await fetch("/api/certs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, score: report?.overall ?? 0, hash: h }) }).then((x) => x.json());
+      if (r.cert) setCert({ ...rec, id: r.cert.id });
+    } catch {}
+  }
+
+  function download(kind: "md" | "txt" | "json") {
+    const body = improved || content;
+    let blob: Blob; let ext = kind;
+    if (kind === "json") {
+      const pack = { format: "stdyai-diksha-pack/1.0", title, subject: "General", board: "NCERT", language: "en", bisScore: report?.overall ?? null, grade: report?.grade ?? null, content: body, exportedAt: new Date().toISOString() };
+      blob = new Blob([JSON.stringify(pack, null, 2)], { type: "application/json" });
+    } else {
+      blob = new Blob([`# ${title}\n\n${body}`], { type: "text/plain" });
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(title || "lesson").replace(/[^\w\- ]+/g, "").slice(0, 40)}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
   const color = (s: string) => s === "pass" ? "bg-emerald-100 text-emerald-700" : s === "partial" ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-700";
@@ -80,14 +135,11 @@ function TeacherDash() {
         <div className="card p-5">
           <label className="font-semibold text-sm">Lesson title</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
-          <label className="font-semibold text-sm mt-3 block">Lesson content <span className="font-normal text-slate-500">(paste text, .txt, or Word text)</span></label>
+          <label className="font-semibold text-sm mt-3 block">Lesson content <span className="font-normal text-slate-500">(.txt, .md, .docx, .pdf)</span></label>
           <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={10} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
-          <div className="flex gap-2 mt-3 flex-wrap">
-            <input type="file" accept=".txt,.md,.doc,.docx" className="text-xs" onChange={async (e) => {
-              const f = e.target.files?.[0]; if (!f) return;
-              const t = await f.text().catch(() => ""); setContent(t.slice(0, 12000) || content);
-              if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
-            }} />
+          <div className="flex gap-2 mt-3 flex-wrap items-center">
+            <input type="file" accept=".txt,.md,.docx,.pdf" className="text-xs" onChange={(e) => onFile(e.target.files?.[0])} />
+            {parsing && <span className="text-xs text-indigo-600">Parsing file…</span>}
           </div>
           {err && <div className="mt-2 text-sm text-red-600">{err}</div>}
           <div className="flex gap-2 mt-3 flex-wrap">
@@ -136,9 +188,10 @@ function TeacherDash() {
               {cert && (
                 <div className="mt-3 rounded-xl bg-slate-900 text-white p-4 text-sm">
                   <div className="font-bold">✅ BIS-Aligned Content Certificate</div>
-                  <div>ID: STDY-{cert.short}</div>
+                  <div>ID: {cert.id ?? `STDY-${cert.short}`}</div>
                   <div className="break-all text-xs opacity-80">SHA-256: {cert.hash}</div>
-                  <div className="text-xs opacity-80">“{title}” · Score {report.overall}/100 · Verifiable offline</div>
+                  <div className="text-xs opacity-80">“{title}” · Score {report.overall}/100 · ⛓️ chain-registered</div>
+                  <Link href={`/verify?id=${encodeURIComponent(cert.id ?? cert.hash)}`} className="text-xs underline opacity-90">Verify publicly →</Link>
                 </div>
               )}
             </div>
@@ -148,10 +201,53 @@ function TeacherDash() {
 
       {improved && (
         <div className="card p-5 mt-4">
-          <div className="font-bold">✨ Auto-Improved (BIS-restructured) — editable, saved for Student Twin</div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="font-bold">✨ Auto-Improved (BIS-restructured) — editable, saved for Student Twin</div>
+            <div className="flex gap-2 text-xs">
+              <button onClick={() => download("md")} className="btn-secondary !py-1.5 !px-3">⬇ .md</button>
+              <button onClick={() => download("txt")} className="btn-secondary !py-1.5 !px-3">⬇ .txt</button>
+              <button onClick={() => download("json")} className="btn-secondary !py-1.5 !px-3">📦 DIKSHA-pack</button>
+            </div>
+          </div>
           <textarea value={improved} onChange={(e) => { setImproved(e.target.value); localStorage.setItem("stdyai-content", e.target.value); }} rows={16} className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm whitespace-pre-wrap" />
         </div>
       )}
+
+      <div className="grid md:grid-cols-2 gap-4 mt-4">
+        <div className="card p-5">
+          <div className="font-bold">🏫 My Classrooms</div>
+          <div className="flex gap-2 mt-2">
+            <input value={clsName} onChange={(e) => setClsName(e.target.value)} placeholder="Class 7-A Science" className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+            <button onClick={async () => { const r = await fetch("/api/classroom", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", name: clsName }) }).then((x) => x.json()); if (r.classroom) { setClsName(""); refresh(); } }} className="btn-primary !py-2 !px-4 text-sm">+ Create</button>
+          </div>
+          <div className="mt-3 space-y-2 max-h-64 overflow-auto">
+            {rooms.length === 0 && <div className="text-xs text-slate-500">No classrooms yet. Create one and share the code with students.</div>}
+            {rooms.map((r) => (
+              <div key={r.id} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 text-sm">
+                <div className="flex justify-between items-center"><b>{r.name}</b><span className="badge bg-indigo-100 text-indigo-700">Code: {r.code}</span></div>
+                <div className="mt-1 text-xs text-slate-500">{r.members.length} student(s)</div>
+                {r.members.map((m) => (
+                  <div key={m.id} className="flex justify-between text-xs mt-1 rounded-lg bg-slate-100 dark:bg-slate-800 px-2 py-1">
+                    <span>{m.name}</span><span>{m.attempts} quiz · {m.avg === null ? "—" : `${m.avg}% avg`}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="card p-5">
+          <div className="font-bold">📊 Compliance History (audit log)</div>
+          <div className="mt-2 space-y-1.5 max-h-64 overflow-auto text-sm">
+            {hist.length === 0 && <div className="text-xs text-slate-500">Run your first BIS analysis — it will be logged here.</div>}
+            {hist.map((h) => (
+              <div key={h.id} className="flex justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2">
+                <span className="truncate">{h.title}</span>
+                <span className="shrink-0"><b>{h.overall}</b> · {h.grade.split(" ")[0]} · <span className="text-xs text-slate-500">{new Date(h.at).toLocaleDateString()}</span></span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

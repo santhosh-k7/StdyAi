@@ -33,6 +33,14 @@ function StudentDash() {
   const [score, setScore] = useState<number | null>(null);
   const [offline, setOffline] = useState(false);
   const [listening, setListening] = useState(false);
+  const [order, setOrder] = useState<number[]>(QUIZ.map((_, i) => i));
+  const [myClasses, setMyClasses] = useState<{ id: string; name: string; code: string }[]>([]);
+  const [joinCode, setJoinCode] = useState("");
+  const [joinMsg, setJoinMsg] = useState("");
+  const [history, setHistory] = useState<{ at: string; score: number; total: number; level: string }[]>([]);
+  const [doubt, setDoubt] = useState("");
+  const [recording, setRecording] = useState(false);
+  const qi = order[idx] ?? 0;
 
   useEffect(() => {
     setContent(localStorage.getItem("stdyai-content") || "No lesson yet — ask your teacher to run BIS Analysis first, or open the Teacher tab and use the demo.");
@@ -47,6 +55,7 @@ function StudentDash() {
     setOffline(!navigator.onLine);
     const f = () => setOffline(!navigator.onLine);
     window.addEventListener("online", f); window.addEventListener("offline", f);
+    loadHistory();
     return () => { window.removeEventListener("online", f); window.removeEventListener("offline", f); };
   }, [me, twinKey]);
 
@@ -54,16 +63,48 @@ function StudentDash() {
   function submit() {
     const s = marks.filter(Boolean).length;
     const pct = Math.round((s / QUIZ.length) * 100);
-    setScore(pct); save(updateTwin(twin, pct));
+    const nt = updateTwin(twin, pct);
+    setScore(pct); save(nt);
+    fetch("/api/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ score: s, total: QUIZ.length, level: nt.level }) }).then(() => loadHistory()).catch(() => {});
+  }
+  function loadHistory() {
+    fetch("/api/progress").then((r) => r.json()).then((j) => { if (j.progress) setHistory(j.progress); }).catch(() => {});
+    fetch("/api/classroom").then((r) => r.json()).then((j) => { if (j.rooms) setMyClasses(j.rooms); }).catch(() => {});
   }
   function pick(j: number) {
     if (picked !== null) return;
     setPicked(j);
     setPicks((p) => { const n = [...p]; n[idx] = j; return n; });
-    setMarks((m) => { const n = [...m]; n[idx] = j === QUIZ[idx].a; return n; });
+    setMarks((m) => { const n = [...m]; n[idx] = j === QUIZ[qi].a; return n; });
   }
   function go(n: number) { setIdx(n); setPicked(picks[n] ?? null); }
-  function restart() { setIdx(0); setPicked(null); setPicks([]); setMarks([]); setScore(null); }
+  function restart(missedFirst = false) {
+    let ord = QUIZ.map((_, i) => i);
+    if (missedFirst) {
+      const missed = ord.filter((i) => marks[i] === false);
+      if (missed.length) ord = [...missed, ...ord.filter((i) => marks[i] !== false)];
+    }
+    setOrder(ord); setIdx(0); setPicked(null); setPicks([]); setMarks([]); setScore(null);
+  }
+  function joinClass() {
+    setJoinMsg("");
+    fetch("/api/classroom", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "join", code: joinCode }) })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "Failed"); setJoinCode(""); setJoinMsg(`✅ Joined ${j.classroom.name}!`); loadHistory(); })
+      .catch((e: unknown) => setJoinMsg(e instanceof Error ? `❌ ${e.message}` : "❌ Failed"));
+  }
+  function voiceDoubt() {
+    const SR = (window as unknown as { webkitSpeechRecognition?: new () => { lang: string; onresult: ((e: { results: { transcript: string }[][] }) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void }; SpeechRecognition?: new () => { lang: string; onresult: ((e: { results: { transcript: string }[][] }) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void } }).webkitSpeechRecognition || (window as unknown as { SpeechRecognition?: new () => never }).SpeechRecognition as unknown;
+    if (!SR) { alert("Voice input not supported in this browser (try Chrome)."); return; }
+    if (recording) return;
+    try {
+      const rec = new (SR as new () => { lang: string; onresult: ((e: { results: { transcript: string }[][] }) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void })();
+      rec.lang = "en-IN";
+      rec.onresult = (e) => { const t = e.results[e.results.length - 1][0].transcript; setDoubt((d) => (d ? d + " " : "") + t); };
+      rec.onend = () => setRecording(false);
+      rec.start(); setRecording(true);
+      setTimeout(() => { try { rec.stop(); } catch {} }, 15000);
+    } catch { alert("Could not start microphone."); }
+  }
   function speak() {
     if (!("speechSynthesis" in window)) return alert("Audio not supported here");
     if (listening) { speechSynthesis.cancel(); setListening(false); return; }
@@ -124,11 +165,11 @@ function StudentDash() {
               ))}
             </div>
             <div className="rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950 dark:to-slate-800 p-6 min-h-[240px]">
-              <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">CARD {idx + 1} / {QUIZ.length}</div>
-              <div className="font-bold text-lg mt-1">{QUIZ[idx].q}</div>
+              <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">CARD {idx + 1} / {QUIZ.length}{order[idx] !== idx ? " · 🔁 spaced repetition" : ""}</div>
+              <div className="font-bold text-lg mt-1">{QUIZ[qi].q}</div>
               <div className="mt-3 space-y-2">
-                {QUIZ[idx].opts.map((o, j) => {
-                  const isAns = j === QUIZ[idx].a;
+                {QUIZ[qi].opts.map((o, j) => {
+                  const isAns = j === QUIZ[qi].a;
                   const cls = picked === null
                     ? "border-slate-200 dark:border-slate-600 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900 cursor-pointer"
                     : isAns ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/40"
@@ -143,10 +184,10 @@ function StudentDash() {
               </div>
               {picked !== null && (
                 <div className="mt-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 text-sm">
-                  <div className={`font-bold ${picked === QUIZ[idx].a ? "text-emerald-600" : "text-red-500"}`}>
-                    {picked === QUIZ[idx].a ? "🎉 Correct!" : `✏️ Answer: ${QUIZ[idx].opts[QUIZ[idx].a]}`}
+                  <div className={`font-bold ${picked === QUIZ[qi].a ? "text-emerald-600" : "text-red-500"}`}>
+                    {picked === QUIZ[qi].a ? "🎉 Correct!" : `✏️ Answer: ${QUIZ[qi].opts[QUIZ[qi].a]}`}
                   </div>
-                  <div className="mt-1 text-slate-600 dark:text-slate-300">💡 {QUIZ[idx].why}</div>
+                  <div className="mt-1 text-slate-600 dark:text-slate-300">💡 {QUIZ[qi].why}</div>
                   <div className="flex gap-2 mt-3">
                     {idx > 0 && <button onClick={() => go(idx - 1)} className="btn-secondary !py-1.5 !px-3 text-sm">← Back</button>}
                     {idx < QUIZ.length - 1
@@ -163,12 +204,46 @@ function StudentDash() {
             <div className="text-sm text-slate-600 dark:text-slate-300 mt-1">
               {marks.filter(Boolean).length}/{QUIZ.length} correct · Twin updated → <b>{twin.level}</b> · Avg {twin.scoreAvg}%
             </div>
-            <div className="flex gap-2 justify-center mt-3">
-              <button onClick={restart} className="btn-secondary !py-2">🔁 Retry deck</button>
+            <div className="flex gap-2 justify-center mt-3 flex-wrap">
+              <button onClick={() => restart(false)} className="btn-secondary !py-2">🔁 Retry deck</button>
+              {marks.some((m) => m === false) && <button onClick={() => restart(true)} className="btn-secondary !py-2">🎯 Retry missed first</button>}
               <Link href="/teacher" className="btn-primary !py-2">← Back to Teacher</Link>
             </div>
           </div>
         )}
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-4 mt-4">
+        <div className="card p-5">
+          <div className="font-bold">🏫 My Classrooms</div>
+          {myClasses.length === 0 && <div className="text-xs text-slate-500 mt-1">Ask your teacher for the class code.</div>}
+          {myClasses.map((c) => <div key={c.id} className="mt-1 text-sm rounded-xl bg-slate-100 dark:bg-slate-800 px-3 py-2"><b>{c.name}</b> <span className="text-xs text-slate-500">· {c.code}</span></div>)}
+          <div className="flex gap-2 mt-2">
+            <input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="CODE" maxLength={6} className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm uppercase" />
+            <button onClick={joinClass} className="btn-primary !py-2 !px-4 text-sm">Join</button>
+          </div>
+          {joinMsg && <div className="text-xs mt-1">{joinMsg}</div>}
+        </div>
+        <div className="card p-5">
+          <div className="font-bold">📈 My Progress (saved to database)</div>
+          {history.length === 0 && <div className="text-xs text-slate-500 mt-1">Finish a flashcard deck — attempts are tracked here.</div>}
+          <div className="mt-2 space-y-1.5 max-h-48 overflow-auto">
+            {history.slice(0, 10).map((h, i) => (
+              <div key={i} className="text-xs">
+                <div className="flex justify-between"><span>{new Date(h.at).toLocaleString()}</span><b>{Math.round((h.score / Math.max(1, h.total)) * 100)}%</b></div>
+                <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 mt-0.5"><div className="h-1.5 rounded-full bg-indigo-500" style={{ width: `${(h.score / Math.max(1, h.total)) * 100}%` }} /></div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="card p-5">
+          <div className="font-bold">❓ Ask Your Teacher (type or speak)</div>
+          <textarea value={doubt} onChange={(e) => setDoubt(e.target.value)} rows={3} placeholder="Meri doubt likho ya bolo…" className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+          <div className="flex gap-2 mt-2">
+            <button onClick={voiceDoubt} className="btn-secondary !py-1.5 !px-3 text-sm">{recording ? "🔴 Listening…" : "🎤 Speak"}</button>
+            <button onClick={() => { if (doubt.trim()) { alert("✅ Doubt saved! Show it to your teacher."); setDoubt(""); } }} className="btn-primary !py-1.5 !px-4 text-sm">Save doubt</button>
+          </div>
+        </div>
       </div>
     </main>
   );

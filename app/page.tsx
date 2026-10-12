@@ -25,6 +25,7 @@ export default function Home() {
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href="/teacher" className="btn-primary">👩‍🏫 Teacher Co-Pilot</Link>
             <Link href="/student" className="btn-secondary">🧒 Student Digital Twin</Link>
+            <Link href="/verify" className="btn-secondary">🔍 Verify Certificate</Link>
           </div>
           <div className="mt-6 grid grid-cols-3 gap-3 text-center">
             {[["Compliance Engine", "10 clauses"], ["Digital Twin", "Adaptive"], ["Certificate", "SHA-256"]].map(([a, b]) => (

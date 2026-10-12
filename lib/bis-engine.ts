@@ -203,7 +203,13 @@ export function autoImprove(title: string, raw: string, report: ComplianceReport
   out += `## Indian Examples\n- Village/monsoon/market example to connect concept to daily life.\n- *Imagine you and your friend…* — talk, predict, then verify.\n\n`;
   out += `## ✏️ Quick Check (5 Questions)\n1. (MCQ) What is the main idea? a) … b) … c) … → **Answer: b.** *Because…*\n2. (MCQ) Which Indian example fits best? → **Answer + 1-line reason.**\n3. (True/False) … → **Answer + explanation.**\n4. (Short) Explain in 2 lines in your own words. *(Rubric: 2 = correct + example, 1 = partial, 0 = off-topic)*\n5. (Activity) Draw/label or demonstrate one step. *(Rubric included)*\n\n`;
   out += `## Summary — Key Points (Revision + Offline Print)\n- Point 1: core idea in 12 words.\n- Point 2: Indian example.\n- Point 3: what to remember for exam.\n\n📦 **Offline Pack:** this page is printable (1-page summary) and works without internet.\n\n`;
-  out += `## Glossary (English → हिंदी)\n- Concept — अवधारणा | Example — उदाहरण | Observe — निरीक्षण करना | Activity — गतिविधि\n\n`;
+  out += `## Glossary (6 Indian Languages — 22-language rollout in progress)\n`;
+  out += `- **हिंदी:** अवधारणा (concept) · उदाहरण (example) · निरीक्षण (observe) · गतिविधि (activity)\n`;
+  out += `- **தமிழ்:** கருத்து (concept) · எடுத்துக்காட்டு (example) · கவனி (observe) · செயல்பாடு (activity)\n`;
+  out += `- **తెలుగు:** భావన (concept) · ఉదాహరణ (example) · గమనించు (observe) · కృత్యం (activity)\n`;
+  out += `- **বাংলা:** ধারণা (concept) · উদাহরণ (example) · পর্যবেক্ষণ (observe) · কার্যকলাপ (activity)\n`;
+  out += `- **मराठी:** संकल्पना (concept) · उदाहरण (example) · निरीक्षण (observe) · कृती (activity)\n`;
+  out += `- **ಕನ್ನಡ:** ಪರಿಕಲ್ಪನೆ (concept) · ಉದಾಹರಣೆ (example) · ಗಮನಿಸು (observe) · ಚಟುವಟಿಕೆ (activity)\n\n`;
   out += `## 💡 Hint & ❓ Ask Your Teacher\n- **Hint:** re-read Key Concepts slowly, then try Q1 again.\n- **Doubt box:** write your question and ask your teacher/parent.\n- **I can now…:** ☐ explain ☐ do activity ☐ score 4/5\n`;
   return out;
 }
