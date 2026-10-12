@@ -5,11 +5,12 @@ export default function Home() {
     <main className="min-h-screen">
       <nav className="max-w-6xl mx-auto flex items-center justify-between px-6 py-5">
         <div className="font-extrabold text-xl">📚 Stdy<span className="text-indigo-600">AI</span></div>
-        <div className="flex gap-2 text-sm">
+        <div className="flex gap-2 text-sm items-center">
           <span className="badge bg-indigo-100 text-indigo-700">IS 19450:2025</span>
           <span className="badge bg-emerald-100 text-emerald-700">IS 18888</span>
           <span className="badge bg-amber-100 text-amber-800">ISO 21001</span>
           <span className="badge bg-slate-900 text-white">NEP 2020</span>
+          <Link href="/login" className="btn-secondary !py-1.5 !px-4 !text-sm">🔑 Login</Link>
         </div>
       </nav>
       <section className="max-w-6xl mx-auto px-6 pt-10 pb-16 grid md:grid-cols-2 gap-10 items-center">

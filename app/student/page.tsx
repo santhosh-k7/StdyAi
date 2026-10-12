@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { defaultTwin, personalize, updateTwin, type Twin } from "@/lib/twin";
+import { RequireRole, UserBar, useMe } from "@/components/auth-clients";
 
 const QUIZ = [
   { q: "What do plants take from the air?", opts: ["Oxygen", "Carbon dioxide", "Nitrogen"], a: 1, why: "Plants absorb CO₂ through tiny leaf pores called stomata. Oxygen is what they release, not take in." },
@@ -12,6 +13,16 @@ const QUIZ = [
 ];
 
 export default function StudentPage() {
+  return (
+    <RequireRole role="student">
+      <StudentDash />
+    </RequireRole>
+  );
+}
+
+function StudentDash() {
+  const { me } = useMe();
+  const twinKey = `stdyai-twin-${me?.id ?? "guest"}`;
   const [twin, setTwin] = useState<Twin>(defaultTwin);
   const [content, setContent] = useState("");
   const [title, setTitle] = useState("");
@@ -26,15 +37,20 @@ export default function StudentPage() {
   useEffect(() => {
     setContent(localStorage.getItem("stdyai-content") || "No lesson yet — ask your teacher to run BIS Analysis first, or open the Teacher tab and use the demo.");
     setTitle(localStorage.getItem("stdyai-title") || "Digital Twin Lesson");
-    const t = localStorage.getItem("stdyai-twin");
+    const t = localStorage.getItem(twinKey);
     if (t) { try { setTwin(JSON.parse(t)); } catch {} }
+    else if (me?.name) {
+      const n = { ...defaultTwin, name: me.name };
+      setTwin(n);
+      localStorage.setItem(twinKey, JSON.stringify(n));
+    }
     setOffline(!navigator.onLine);
     const f = () => setOffline(!navigator.onLine);
     window.addEventListener("online", f); window.addEventListener("offline", f);
     return () => { window.removeEventListener("online", f); window.removeEventListener("offline", f); };
-  }, []);
+  }, [me, twinKey]);
 
-  function save(t: Twin) { setTwin(t); localStorage.setItem("stdyai-twin", JSON.stringify(t)); }
+  function save(t: Twin) { setTwin(t); localStorage.setItem(twinKey, JSON.stringify(t)); }
   function submit() {
     const s = marks.filter(Boolean).length;
     const pct = Math.round((s / QUIZ.length) * 100);
@@ -65,6 +81,7 @@ export default function StudentPage() {
         <Link href="/" className="font-extrabold text-lg">📚 Stdy<span className="text-indigo-600">AI</span></Link>
         <div className="flex gap-2 items-center text-sm">
           <span className={`badge ${offline ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"}`}>{offline ? "📴 Offline mode" : "🌐 Online"}</span>
+          <UserBar me={me} />
           <Link href="/teacher" className="btn-secondary !py-2 !px-4 text-sm">← Teacher</Link>
         </div>
       </div>

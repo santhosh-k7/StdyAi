@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { sha256Hex, shortHash } from "@/lib/cert";
+import { RequireRole, UserBar, useMe } from "@/components/auth-clients";
 
 type Clause = { id: string; standard: string; title: string; score: number; status: string; feedback: string; suggestion: string; };
 type Report = { overall: number; grade: string; clauses: Clause[]; summary: string; predictedGain: number; accessibilityCoverage: number; timestamp: string; };
@@ -10,6 +11,15 @@ const DEMO_TITLE = "Photosynthesis — Class 7 Science";
 const DEMO_CONTENT = `Photosynthesis is how plants make food. Plants take water from soil and carbon dioxide from air. Chlorophyll traps sunlight. Then glucose is made and oxygen is released. This is important for life on earth. Students should remember the equation.`;
 
 export default function TeacherPage() {
+  return (
+    <RequireRole role="teacher">
+      <TeacherDash />
+    </RequireRole>
+  );
+}
+
+function TeacherDash() {
+  const { me } = useMe();
   const [title, setTitle] = useState(DEMO_TITLE);
   const [content, setContent] = useState(DEMO_CONTENT);
   const [report, setReport] = useState<Report | null>(null);
@@ -58,7 +68,8 @@ export default function TeacherPage() {
     <main className="min-h-screen max-w-6xl mx-auto px-6 py-6">
       <div className="flex items-center justify-between">
         <Link href="/" className="font-extrabold text-lg">📚 Stdy<span className="text-indigo-600">AI</span></Link>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <UserBar me={me} />
           <Link href="/student" className="btn-secondary !py-2 !px-4 text-sm">🧒 Student view →</Link>
         </div>
       </div>
