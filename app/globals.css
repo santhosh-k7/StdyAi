@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+.card {
+  @apply bg-white rounded-2xl shadow-sm border border-slate-200;
+}
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-white font-semibold hover:bg-indigo-700 transition active:scale-[0.98] disabled:opacity-50;
+}
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 font-semibold border border-slate-300 hover:bg-slate-100 transition;
+}
+.badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+}
+
+/* ---------- Dark mode ---------- */
+.dark {
+  color-scheme: dark;
+}
+.dark body {
+  @apply bg-slate-950 text-slate-100;
+}
+.dark .card {
+  @apply bg-slate-900 border-slate-800 text-slate-100;
+}
+.dark .btn-secondary {
+  @apply bg-slate-800 border-slate-600 text-slate-100;
+}
+.dark input:not([type="radio"]):not([type="checkbox"]),
+.dark textarea,
+.dark select {
+  @apply bg-slate-800 border-slate-600 text-slate-100;
+}
+.dark input[type="file"] {
+  @apply text-slate-300;
+}
+.dark details {
+  @apply border-slate-700;
+}
+.dark .text-slate-700,
+.dark .text-slate-600 {
+  @apply text-slate-300;
+}
+.dark .text-slate-500 {
+  @apply text-slate-400;
+}
+.dark .bg-slate-100 {
+  @apply bg-slate-800;
+}
+.dark .border-slate-200 {
+  @apply border-slate-700;
+}
+.dark .border-slate-300 {
+  @apply border-slate-600;
+}
+.dark label.hover\:bg-slate-100:hover {
+  @apply bg-slate-800;
+}

@@ -1,0 +1,1 @@
+{"name": "StdyAI", "short_name": "StdyAI", "description": "BIS-Compliant Adaptive Learning — offline-first PWA", "start_url": "/", "display": "standalone", "background_color": "#ffffff", "theme_color": "#4f46e5", "icons": [{"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml"}]}
