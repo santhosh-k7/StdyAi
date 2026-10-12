@@ -1,4 +1,5 @@
 import { promises as fs } from "fs";
+import os from "os";
 import path from "path";
 
 export type Role = "teacher" | "student";
@@ -14,7 +15,10 @@ export type User = {
 export type Session = { token: string; userId: string; expiresAt: number };
 type DB = { users: User[]; sessions: Session[] };
 
-const DB_PATH = path.join(process.cwd(), "data", "db.json");
+// Serverless filesystems (Vercel/AWS Lambda) are read-only except /tmp.
+// Local dev uses ./data (persisted, gitignored); production uses /tmp.
+const DB_DIR = process.env.VERCEL === "1" ? path.join(os.tmpdir(), "stdyai-data") : path.join(process.cwd(), "data");
+const DB_PATH = path.join(DB_DIR, "db.json");
 
 async function ensureFile() {
   await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
